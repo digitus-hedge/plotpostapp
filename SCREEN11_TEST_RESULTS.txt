@@ -1,0 +1,214 @@
+PlotPost backend tests after Screen 11 (Messages, Chat) + Screens 1-10
+Run: 2026-11-22T08:30:36Z   Database: FerretDB 1.24 (MongoDB-compatible)   Cloudinary: faked in tests
+Result: 185 passed, 0 failed, 1 skipped, 186 total
+Skipped here: one Screen 8 test needs real MongoDB (FerretDB can lose writes that land at the same moment). It runs with plain `npm test` on your PC.
+
+chat.test.js
+  PASS  starting a chat > one chat per pair, whoever starts it; about a post
+  PASS  starting a chat > not with yourself, unknown people, missing posts, or without login
+  PASS  starting a chat > 20 new chats a day; reopening an existing chat doesn't count
+  PASS  sending and reading > messages, unread counts, the badge and Seen
+  PASS  sending and reading > 30 at a time, older ones by scrolling up, new ones since the last seen
+  PASS  sending and reading > empty and over-long messages, strangers and bad IDs are refused
+  PASS  sending and reading > 30 messages a minute per account
+  PASS  deleting a chat for yourself > leaves your list and history; the other person keeps it; a new message brings it back
+  PASS  blocking > blocked people can't message you, and you can't message them until you unblock
+  PASS  links with other screens > Buyer Inquiries says whether the buyer has an account (so the seller can chat)
+  PASS  links with other screens > deleting an account deletes its chats and messages, and others' blocks of it
+
+profile.test.js
+  PASS  profile > your real details and numbers, with nothing secret
+  PASS  profile > an old photo saved as a phone file path is not sent
+  PASS  edit profile > saves only what you send, trimmed; email can't be changed here
+  PASS  edit profile > bad values are refused with the reason
+  PASS  edit profile > a new photo replaces the old one in Cloudinary; removing it deletes it
+  PASS  edit profile > notification switches are saved
+  PASS  edit profile > profile photo upload: square, 400 px, in plotpost/avatars
+  PASS  change password > logs out other phones; this phone gets a new login
+  PASS  change password > wrong current password, same password and weak passwords are refused
+  PASS  change password > Google-only accounts are sent to Forgot Password
+  PASS  log out of all devices > ends every other login, including on pages guests can see
+  PASS  log out of all devices > resetting the password with the emailed code also logs out other phones
+  PASS  delete account > needs your password (or DELETE for Google-only accounts)
+  PASS  delete account > removes your posts, comments, likes, follows and enquiries, and nobody else's
+
+enquiries.test.js
+  PASS  Show Interest > a guest's interest reaches the seller; title and seller come from the post
+  PASS  Show Interest > the seller's account name is used when the post has no seller name
+  PASS  Show Interest > the same person again updates their enquiry instead of making a copy
+  PASS  Show Interest > guests are matched by phone number
+  PASS  Show Interest > bad details are refused with a clear reason
+  PASS  Show Interest > your own post, sold or rented posts and missing posts are refused
+  PASS  Show Interest > a broken login is treated as a guest, not refused
+  PASS  Buyer Inquiries > only enquiries on your posts, newest first, with filters and paging
+  PASS  Buyer Inquiries > older enquiries (from before they were linked to the seller) still show
+  PASS  Buyer Inquiries > an enquiry stays after its post is deleted, with the title it was about
+  PASS  marking read and changing status > only the seller can; read, unread and status work
+  PASS  enquiries you sent > listed newest first with a short post summary; you can delete your own
+
+enquiryLimits.test.js
+  PASS  guests: 5 an hour per connection; accounts: 10 an hour each
+
+social.test.js
+  PASS  reading comments > guests can read; newest first; names and photos but no emails; Seller label
+  PASS  reading comments > who may delete: your own comments, and every comment on your post
+  PASS  reading comments > 20 at a time with hasMore; a deleted post gives 404
+  PASS  posting comments > returns the new comment and the count; the feed count goes up
+  PASS  posting comments > needs login; empty and over-long comments are refused
+  SKIPPED (needs real MongoDB)  posting comments > people commenting at the same moment all keep their comments
+  PASS  posting comments > 20 comments per 10 minutes per account, then a clear message
+  PASS  deleting comments > you can delete yours; the seller can delete any on their post; others can't
+  PASS  reports > stored with reason and details; reporting again updates the same report
+  PASS  reports > needs login; bad reasons, long details and your own post are refused
+  PASS  reports > 10 reports per hour per account
+  PASS  reports > the review script groups reports by post, most reported first, and marks them done
+  PASS  share counts > counted once per person per day, never the seller's own, shown only to the seller
+
+saved.test.js
+  PASS  save and unsave > saving twice keeps one save; removing twice is fine too
+  PASS  save and unsave > with no body it still toggles, as before
+  PASS  save and unsave > each account has its own saves; guests must log in
+  PASS  save and unsave > bad IDs and values are refused; a missing post can't be saved but can be removed
+  PASS  save and unsave > 500 saves at most, with a clear message
+  PASS  Saved tab list > newest saved first, in the feed format (counts, no like lists, no emails)
+  PASS  Saved tab list > sold and rented posts stay with their status; deleted posts drop out
+  PASS  moving saves from the phone to the account > adds the posts that exist and skips the rest; safe to repeat
+  PASS  moving saves from the phone to the account > stops at 500 and says so; bad requests and guests are refused
+  PASS  posts by ID (a guest's Saved tab) > in the order asked, sold ones included, missing and bad IDs left out
+  PASS  posts by ID (a guest's Saved tab) > more than 100 at once is refused
+  PASS  profile > returns saved post IDs only, not whole posts
+
+search.test.js
+  PASS  price and bedroom numbers > common price formats become rupees
+  PASS  price and bedroom numbers > unclear prices give no number instead of a guess
+  PASS  price and bedroom numbers > set when a post is created, and kept up to date when it's edited
+  PASS  search > every word must match, in any field, in any case
+  PASS  search > finds posts by the seller name on the post or the seller's account name
+  PASS  search > symbols are searched as text, and very long searches are refused
+  PASS  Filter screen > property types: one or several; unknown types are refused
+  PASS  Filter screen > For sale / For rent; Any shows both
+  PASS  Filter screen > price range: sale prices, monthly rents, and posts with no clear price
+  PASS  Filter screen > bad prices are refused with a clear reason
+  PASS  Filter screen > video tours only
+  PASS  Filter screen > minimum bedrooms; posts without a bedroom count are left out only while it's set
+  PASS  Filter screen > everything together, with paging, the real total, and sold posts still hidden
+  PASS  Filter screen > search and filters also work on the Following tab
+  PASS  backfill script for existing posts > report only by default; --apply fills in just the two numbers
+
+myListings.test.js
+  PASS  My Listings > only your posts, newest first, with views, likes, comments and tap counts
+  PASS  My Listings > includes sold and rented posts; guests are refused
+  PASS  mark as sold / rented / active > sold and rented posts leave the home feed and the Following tab, and come back when active
+  PASS  mark as sold / rented / active > a sold post still opens on its own page, showing its status
+  PASS  mark as sold / rented / active > older posts without a status count as active
+  PASS  mark as sold / rented / active > only the seller can change it; bad values and IDs are refused
+  PASS  edit post > updates the same post (never creates a copy)
+  PASS  edit post > keeping photos and adding new ones keeps them all
+  PASS  edit post > photos removed in an edit are deleted from Cloudinary
+  PASS  edit post > never deletes photos that aren't ours (YouTube, old base64, other Cloudinary accounts)
+  PASS  edit post > a failed edit deletes nothing
+  PASS  delete post > removes the post, its photos, its view records and it from saved lists
+  PASS  delete post > still deletes the post when Cloudinary fails
+  PASS  delete post > other people can't delete your post, and nothing is touched
+
+postDetails.test.js
+  PASS  post details > returns the latest copy of the post (after the seller edits it)
+  PASS  post details > includes the seller card: name, photo, listings, followers, member since; never email
+  PASS  post details > shows whether you follow the seller, and marks your own post
+  PASS  post details > a deleted post answers 404 with a clear message; a bad ID answers 400
+  PASS  post details > guests and broken logins can open details
+  PASS  post details > /api/posts/my still reaches My Listings, not the details route
+  PASS  views > each person counts once a day; a second open the same day doesn't count
+  PASS  views > the seller's own opens don't count
+  PASS  views > the same person counts again on a new day
+  PASS  views > guests count once per internet address, stored only as a hash
+  PASS  views > several opens at the same moment still count once
+  PASS  views > views show in the feed too
+  PASS  views > deleted and bad posts are refused
+  PASS  Call and Open-link taps > counted once per person per day, separately for call and link
+  PASS  Call and Open-link taps > the seller's own taps don't count
+  PASS  Call and Open-link taps > only the seller sees the tap counts (details and feed)
+  PASS  Call and Open-link taps > unknown actions and bad posts are refused
+  PASS  deleting a post > also removes its view records
+
+createPost.test.js
+  PASS  photo upload (POST /api/upload) > uploads to Cloudinary: shrunk to 1600 px, saved as JPG, in plotpost/posts
+  PASS  photo upload (POST /api/upload) > accepts iPhone HEIC photos
+  PASS  photo upload (POST /api/upload) > refuses other file types, missing files and guests
+  PASS  photo upload (POST /api/upload) > refuses photos over 8 MB
+  PASS  photo upload (POST /api/upload) > says so clearly when Cloudinary fails or isn't set up
+  PASS  create post > a photo post saves every field, including seller name and photo links
+  PASS  create post > a YouTube link post keeps its video tag and thumbnail
+  PASS  create post > the feed shows the new post with its seller name and video tag
+  PASS  create post > new base64 photos are refused (photos must be uploaded first)
+  PASS  create post > a photo post needs at least one photo, and at most 8
+  PASS  create post > a link post needs a real web link
+  PASS  create post > explains what's wrong with bad input 0
+  PASS  create post > explains what's wrong with bad input 1
+  PASS  create post > explains what's wrong with bad input 2
+  PASS  create post > explains what's wrong with bad input 3
+  PASS  create post > explains what's wrong with bad input 4
+  PASS  create post > explains what's wrong with bad input 5
+  PASS  create post > explains what's wrong with bad input 6
+  PASS  create post > explains what's wrong with bad input 7
+  PASS  create post > explains what's wrong with bad input 8
+  PASS  create post > can't set the owner, likes or comments from the app
+  PASS  create post > guests can't publish
+  PASS  edit post (same save path as Create Post) > older posts with base64 photos can still be edited without re-uploading
+  PASS  edit post (same save path as Create Post) > but new base64 photos can't be added on edit
+  PASS  edit post (same save path as Create Post) > photos can be replaced with uploaded ones
+  PASS  edit post (same save path as Create Post) > a photo post can't end up with no photos
+  PASS  edit post (same save path as Create Post) > edits are checked like new posts, and only the owner can edit
+
+browse.test.js
+  PASS  home feed > only real posts, newest first, 10 at a time with hasMore
+  PASS  home feed > each post has counts and seller name/photo, but no like/comment lists or seller email
+  PASS  home feed > platform tabs filter on the server; All shows everything
+  PASS  home feed > location chips match part of the location, any letter case
+  PASS  home feed > special characters in the location search don't break it
+  PASS  home feed > filters combine with paging
+  PASS  home feed > guests can browse; a broken or expired login doesn't break the feed
+  PASS  likes > tap toggles; the feed then shows the right count and isLiked for you only
+  PASS  likes > double-tap (like: true) never unlikes and never counts twice
+  PASS  likes > many fast taps at once still count as one like
+  PASS  likes > likes from different people add up
+  PASS  likes > guests must log in; bad and unknown posts are refused
+  PASS  following sellers > follow and unfollow, with follower counts
+  PASS  following sellers > following twice (even at the same moment) stores it once
+  PASS  following sellers > refuses following yourself, unknown users, bad IDs and guests
+  PASS  following sellers > the following list shows who you follow, with their post counts
+  PASS  following sellers > suggested sellers: most posts first, not you, marks who you follow; guests can see it
+  PASS  following sellers > Following feed: posts from sellers you follow plus your own, nobody else's
+  PASS  other screens are unaffected > creating a post and My Listings still work
+  PASS  other screens are unaffected > profile and saved routes still answer
+
+auth.test.js
+  PASS  Sign Up > creates the account and returns the same fields the app reads
+  PASS  Sign Up > refuses an email that's already registered, in any letter case
+  PASS  Sign Up > explains what's wrong with bad input 0
+  PASS  Sign Up > explains what's wrong with bad input 1
+  PASS  Sign Up > explains what's wrong with bad input 2
+  PASS  Sign Up > explains what's wrong with bad input 3
+  PASS  Sign Up > explains what's wrong with bad input 4
+  PASS  Log In > works with the right password, typed email in any case
+  PASS  Log In > wrong password and unknown email get the same answer
+  PASS  Log In > accounts with old 6-character passwords can still log in
+  PASS  Log In > blocks database-operator tricks in the login form
+  PASS  Log In > missing fields and broken JSON get a clear 400
+  PASS  Log In > too many attempts are slowed down (rate limit)
+  PASS  Forgot Password > known and unknown emails get the same answer; only real accounts get a code
+  PASS  Forgot Password > the code is never stored as plain text
+  PASS  Forgot Password > asking again within a minute doesn't send another email
+  PASS  Forgot Password > reset with the code sets the new password and logs the user in
+  PASS  Forgot Password > 5 wrong codes lock the code, even the right one afterwards
+  PASS  Forgot Password > an expired code doesn't work
+  PASS  Forgot Password > the new password must follow the password rules
+  PASS  Forgot Password > says so clearly when email sending isn't set up
+  PASS  Continue with Google > first time creates an account with no password; next time logs in
+  PASS  Continue with Google > links to an existing account with the same Google-verified email
+  PASS  Continue with Google > won't link when Google hasn't verified the email
+  PASS  Continue with Google > a Google-only account can't log in with a password until it sets one via Forgot Password
+  PASS  Continue with Google > a token Google rejects gets 401; a missing token gets 400
+  PASS  Continue with Google > says so clearly when Google sign-in isn't set up on the server
+  PASS  other screens are unaffected > the login token still opens protected routes (profile)
+  PASS  other screens are unaffected > health check and unknown URLs answer in JSON

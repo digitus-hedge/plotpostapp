@@ -1,0 +1,85 @@
+PlotPost backend tests after Screen 3 (Create Post) + Screens 1-2
+Run: 2026-11-21T04:50:44.241Z   Database: FerretDB 1.24 (MongoDB-compatible)   Cloudinary: faked in tests
+Result: 76 passed, 0 failed, 76 total
+
+browse.test.js
+  PASS  home feed > only real posts, newest first, 10 at a time with hasMore
+  PASS  home feed > each post has counts and seller name/photo, but no like/comment lists or seller email
+  PASS  home feed > platform tabs filter on the server; All shows everything
+  PASS  home feed > location chips match part of the location, any letter case
+  PASS  home feed > special characters in the location search don't break it
+  PASS  home feed > filters combine with paging
+  PASS  home feed > guests can browse; a broken or expired login doesn't break the feed
+  PASS  likes > tap toggles; the feed then shows the right count and isLiked for you only
+  PASS  likes > double-tap (like: true) never unlikes and never counts twice
+  PASS  likes > many fast taps at once still count as one like
+  PASS  likes > likes from different people add up
+  PASS  likes > guests must log in; bad and unknown posts are refused
+  PASS  following sellers > follow and unfollow, with follower counts
+  PASS  following sellers > following twice (even at the same moment) stores it once
+  PASS  following sellers > refuses following yourself, unknown users, bad IDs and guests
+  PASS  following sellers > the following list shows who you follow, with their post counts
+  PASS  following sellers > suggested sellers: most posts first, not you, marks who you follow; guests can see it
+  PASS  following sellers > Following feed: posts from sellers you follow plus your own, nobody else's
+  PASS  other screens are unaffected > creating a post and My Listings still work
+  PASS  other screens are unaffected > profile and saved routes still answer
+
+createPost.test.js
+  PASS  photo upload (POST /api/upload) > uploads to Cloudinary: shrunk to 1600 px, saved as JPG, in plotpost/posts
+  PASS  photo upload (POST /api/upload) > accepts iPhone HEIC photos
+  PASS  photo upload (POST /api/upload) > refuses other file types, missing files and guests
+  PASS  photo upload (POST /api/upload) > refuses photos over 8 MB
+  PASS  photo upload (POST /api/upload) > says so clearly when Cloudinary fails or isn't set up
+  PASS  create post > a photo post saves every field, including seller name and photo links
+  PASS  create post > a YouTube link post keeps its video tag and thumbnail
+  PASS  create post > the feed shows the new post with its seller name and video tag
+  PASS  create post > new base64 photos are refused (photos must be uploaded first)
+  PASS  create post > a photo post needs at least one photo, and at most 8
+  PASS  create post > a link post needs a real web link
+  PASS  create post > explains what's wrong with bad input 0
+  PASS  create post > explains what's wrong with bad input 1
+  PASS  create post > explains what's wrong with bad input 2
+  PASS  create post > explains what's wrong with bad input 3
+  PASS  create post > explains what's wrong with bad input 4
+  PASS  create post > explains what's wrong with bad input 5
+  PASS  create post > explains what's wrong with bad input 6
+  PASS  create post > explains what's wrong with bad input 7
+  PASS  create post > explains what's wrong with bad input 8
+  PASS  create post > can't set the owner, likes or comments from the app
+  PASS  create post > guests can't publish
+  PASS  edit post (same save path as Create Post) > older posts with base64 photos can still be edited without re-uploading
+  PASS  edit post (same save path as Create Post) > but new base64 photos can't be added on edit
+  PASS  edit post (same save path as Create Post) > photos can be replaced with uploaded ones
+  PASS  edit post (same save path as Create Post) > a photo post can't end up with no photos
+  PASS  edit post (same save path as Create Post) > edits are checked like new posts, and only the owner can edit
+
+auth.test.js
+  PASS  Sign Up > creates the account and returns the same fields the app reads
+  PASS  Sign Up > refuses an email that's already registered, in any letter case
+  PASS  Sign Up > explains what's wrong with bad input 0
+  PASS  Sign Up > explains what's wrong with bad input 1
+  PASS  Sign Up > explains what's wrong with bad input 2
+  PASS  Sign Up > explains what's wrong with bad input 3
+  PASS  Sign Up > explains what's wrong with bad input 4
+  PASS  Log In > works with the right password, typed email in any case
+  PASS  Log In > wrong password and unknown email get the same answer
+  PASS  Log In > accounts with old 6-character passwords can still log in
+  PASS  Log In > blocks database-operator tricks in the login form
+  PASS  Log In > missing fields and broken JSON get a clear 400
+  PASS  Log In > too many attempts are slowed down (rate limit)
+  PASS  Forgot Password > known and unknown emails get the same answer; only real accounts get a code
+  PASS  Forgot Password > the code is never stored as plain text
+  PASS  Forgot Password > asking again within a minute doesn't send another email
+  PASS  Forgot Password > reset with the code sets the new password and logs the user in
+  PASS  Forgot Password > 5 wrong codes lock the code, even the right one afterwards
+  PASS  Forgot Password > an expired code doesn't work
+  PASS  Forgot Password > the new password must follow the password rules
+  PASS  Forgot Password > says so clearly when email sending isn't set up
+  PASS  Continue with Google > first time creates an account with no password; next time logs in
+  PASS  Continue with Google > links to an existing account with the same Google-verified email
+  PASS  Continue with Google > won't link when Google hasn't verified the email
+  PASS  Continue with Google > a Google-only account can't log in with a password until it sets one via Forgot Password
+  PASS  Continue with Google > a token Google rejects gets 401; a missing token gets 400
+  PASS  Continue with Google > says so clearly when Google sign-in isn't set up on the server
+  PASS  other screens are unaffected > the login token still opens protected routes (profile)
+  PASS  other screens are unaffected > health check and unknown URLs answer in JSON

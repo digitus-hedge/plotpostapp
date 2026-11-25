@@ -1,0 +1,80 @@
+PlotPost backend tests - Stage 0 and 1
+Run: 2026-11-19T06:59:37.871Z  Database: FerretDB 1.24 (MongoDB-compatible, SQLite)
+Result: 69 passed, 0 failed, 69 total (4/4 files)
+
+auth.test.js
+  PASS  register > creates an account, returns both tokens and emails a code
+  PASS  register > refuses a duplicate email (any letter case)
+  PASS  register > rejects invalid input 0
+  PASS  register > rejects invalid input 1
+  PASS  register > rejects invalid input 2
+  PASS  register > rejects invalid input 3
+  PASS  register > cannot make itself an admin
+  PASS  login > works with the right password, in any email case
+  PASS  login > gives the same answer for a wrong password and an unknown email
+  PASS  login > existing accounts with old 6-character passwords can still log in
+  PASS  protected routes > need a valid token
+  PASS  protected routes > reject expired tokens and tokens signed with another secret
+  PASS  protected routes > still accept tokens issued by the old backend (no type claim)
+  PASS  refresh tokens > exchange for a new pair, and each refresh token works only once
+  PASS  refresh tokens > reusing an old refresh token ends every session (theft protection)
+  PASS  refresh tokens > garbage and missing tokens are refused
+  PASS  refresh tokens > are stored only as hashes
+  PASS  logout > ends this device's session
+  PASS  logout > succeeds even without a token
+  PASS  logout > logout-all ends every device
+  PASS  email verification > the emailed code verifies the account
+  PASS  email verification > a wrong code fails, and 5 wrong tries lock the code
+  PASS  email verification > resend has a 60-second cooldown and then sends a new code
+  PASS  forgot and reset password > unknown and known emails get the same answer; only real accounts get mail
+  PASS  forgot and reset password > reset with the code changes the password and ends old sessions
+  PASS  change password > needs the current password and a different new one
+  PASS  change password > logs out other devices and keeps this one logged in
+  PASS  Google sign-in > creates a verified account without a password
+  PASS  Google sign-in > links to an existing account with the same verified email
+  PASS  Google sign-in > won't link when Google hasn't verified the email
+  PASS  Google sign-in > a Google-only account can't log in with a password until it sets one
+  PASS  Google sign-in > a rejected Google token returns 401
+  PASS  Google sign-in > a missing Google token returns 400
+
+profile.test.js
+  PASS  view and update profile > returns the profile fields the edit screen uses
+  PASS  view and update profile > saves name, phone, bio, agency, designation and location
+  PASS  view and update profile > ignores attempts to change role, email or verification
+  PASS  view and update profile > rejects an invalid phone number and non-link profile images
+  PASS  account settings > saves the toggles
+  PASS  account settings > rejects empty or wrong-type updates
+  PASS  profile photo > upload stores the Cloudinary link; replacing deletes the old photo
+  PASS  profile photo > rejects non-images and missing files
+  PASS  profile photo > delete clears the photo and removes it from Cloudinary
+  PASS  public profile > shows public details only, and hides the phone when the owner says so
+  PASS  public profile > bad and unknown IDs
+  PASS  public profile > /api/users/saved still reaches the saved-posts route
+  PASS  delete account > needs the right password
+  PASS  delete account > removes the user and everything that belongs to them, and nothing else
+  PASS  delete account > Google-only accounts confirm by typing DELETE
+  PASS  Cloudinary link parsing > finds our public IDs and ignores everything else
+
+existing-endpoints.test.js
+  PASS  create, list, edit and delete a post
+  PASS  other users can't edit or delete your post
+  PASS  save and unsave a post
+  PASS  guests and logged-in users can send enquiries
+  PASS  an invalid token on an optional-login route still gets a 401 (so the app refreshes)
+  PASS  like and comment still work
+
+security.test.js
+  PASS  Stage 0: app basics > root and health respond
+  PASS  Stage 0: app basics > unknown routes return JSON 404
+  PASS  Stage 0: app basics > broken JSON returns 400, not a crash
+  PASS  Stage 0: security headers and CORS > Helmet headers are set and Express is not advertised
+  PASS  Stage 0: security headers and CORS > listed browser origin is allowed
+  PASS  Stage 0: security headers and CORS > unlisted browser origin gets no CORS permission
+  PASS  Stage 0: security headers and CORS > mobile app requests (no Origin header) work
+  PASS  Stage 0: request limits and injection > oversized bodies are rejected outside the posts routes
+  PASS  Stage 0: request limits and injection > posts routes still accept large bodies (base64 photos until Stage 2)
+  PASS  Stage 0: request limits and injection > MongoDB operator injection in login is blocked
+  PASS  Stage 0: request limits and injection > rate limiter returns 429 after too many auth attempts
+  PASS  Stage 0: error handler > unexpected errors never leak internal details
+  PASS  Stage 0: error handler > duplicate key errors become 409
+  PASS  Stage 1: admin-only guard > normal users are refused, admins pass

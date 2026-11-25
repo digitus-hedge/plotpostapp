@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+coverage/
+logs/
+*.log
+.idea/
+.vscode/
+.DS_Store
+
+# Database backups (people's personal data): never commit or upload
+backups/

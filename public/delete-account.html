@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delete your account · PlotPost</title>
+  <meta name="description" content="Delete your PlotPost account and its data, without the app.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/site/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/site/site.css">
+  <script src="/site/delete-account.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/privacy" aria-label="PlotPost"><svg class="brand-mark" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="9" fill="#2563EB"/><path d="M16 6.5c-4.1 0-7.3 3.1-7.3 7.1 0 5.2 7.3 11.9 7.3 11.9s7.3-6.7 7.3-11.9c0-4-3.2-7.1-7.3-7.1z" fill="#fff"/><path d="M12.6 15.2 16 12.4l3.4 2.8v3.3h-6.8z" fill="#2563EB"/></svg><span>PlotPost</span></a>
+      <nav aria-label="PlotPost pages">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/delete-account" aria-current="page">Delete account</a>
+      </nav>
+    </div>
+  </header>
+  <main id="main">
+    <article class="doc">
+      <p class="eyebrow">PlotPost</p>
+      <h1>Delete your PlotPost account</h1>
+      <p class="lead">You can delete your account here, without the app. In the app you can also do it from Profile → Settings (gear icon) → Delete Account.</p>
+
+      <div class="grid2">
+        <section class="card" aria-labelledby="gone">
+          <h2 id="gone">What gets deleted</h2>
+          <ul>
+            <li>Your account and profile</li>
+            <li>Your listings and their photos</li>
+            <li>Inquiries you sent, and inquiries you received for your listings</li>
+            <li>Your chats and their messages (for both people in them)</li>
+            <li>Your comments, likes, follows and saved listings</li>
+            <li>Your notifications and phone alerts</li>
+          </ul>
+          <p class="small">It happens straight away and can't be undone.</p>
+        </section>
+        <section class="card" aria-labelledby="kept">
+          <h2 id="kept">What we keep for a while</h2>
+          <ul>
+            <li>Reports made by you or about you, and records of actions the PlotPost team took: 12 months, then deleted.</li>
+            <li>Server logs and backup copies: up to 30 days.</li>
+          </ul>
+          <p class="small">More in the <a href="/privacy">Privacy Policy</a>.</p>
+        </section>
+      </div>
+
+      <section class="card form-card" aria-labelledby="start">
+        <h2 id="start">Delete my account</h2>
+        <div id="status" class="notice" role="status" aria-live="polite" hidden></div>
+
+        <form id="email-form" novalidate>
+          <label for="email">Email address of your PlotPost account</label>
+          <input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required>
+          <p class="hint">We'll email you a 6-digit code to confirm it's you. If you joined with Google, use your Google email.</p>
+          <button type="submit" class="btn">Email me a code</button>
+        </form>
+
+        <form id="code-form" novalidate hidden>
+          <p class="sent">Code sent to <strong id="sent-to"></strong></p>
+          <label for="code">6-digit code</label>
+          <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required>
+          <label class="check"><input id="understand" type="checkbox" required> <span>I understand that my account and everything listed above will be deleted permanently.</span></label>
+          <button type="submit" class="btn btn-danger">Delete my account</button>
+          <p class="actions"><button type="button" id="resend" class="link">Send a new code</button><span aria-hidden="true"> · </span><button type="button" id="change-email" class="link">Use a different email</button></p>
+        </form>
+
+        <div id="done" hidden>
+          <p class="done-title" id="done-title" tabindex="-1">Your account has been deleted.</p>
+          <p>Thank you for using PlotPost. If the app is still on your phone, you can uninstall it.</p>
+        </div>
+
+        <noscript><p class="notice error">This page needs JavaScript. You can also ask PlotPost support to delete your account: <a href="https://wa.me/916235649489">WhatsApp +91 62356 49489</a>.</p></noscript>
+      </section>
+
+      <p class="aside">Can't get into that email any more? Message PlotPost support on <a href="https://wa.me/916235649489" rel="noopener">WhatsApp +91 62356 49489</a> from the phone number on your account, and we'll help.</p>
+    </article>
+  </main>
+  <footer class="footer">
+    <p>PlotPost support: <a href="https://wa.me/916235649489" rel="noopener">WhatsApp +91 62356 49489</a> or call +91 62356 49489</p>
+    <p><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/delete-account">Delete your account</a></p>
+  </footer>
+</body>
+</html>
