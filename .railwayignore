@@ -1,0 +1,9 @@
+# Never uploaded by `railway up` (as well as everything in .gitignore).
+.env
+.env.*
+!.env.example
+node_modules/
+backups/
+coverage/
+logs/
+*.log
