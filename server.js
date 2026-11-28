@@ -86,6 +86,58 @@ for (const [name, file] of Object.entries(sitePages)) {
   });
 }
 
+// The PlotPost app for computers (Flutter web build in ./webapp), at /app/.
+// Built with: flutter build web --release --base-href /app/ --no-web-resources-cdn
+// Flutter's engine runs as WebAssembly and draws photos, videos and the
+// YouTube / Facebook ... players from other sites, so this page gets its own,
+// wider security policy than the rest of the site.
+const webAppDir = path.join(__dirname, "webapp");
+const webAppRules = (req, res, next) => {
+  res.set({
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "script-src 'self' 'wasm-unsafe-eval'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https:",
+      "media-src 'self' blob: https:",
+      "connect-src 'self' https:",
+      "frame-src https:",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join("; "),
+  });
+  next();
+};
+// (express.static sends /app to /app/ by itself.)
+app.use(
+  "/app",
+  webAppRules,
+  express.static(webAppDir, {
+    index: "index.html",
+    // The start files must always be fresh so a new version shows at once.
+    setHeaders(res, file) {
+      if (/(index\.html|flutter_bootstrap\.js|flutter_service_worker\.js|version\.json)$/.test(file)) {
+        res.set("Cache-Control", "no-cache");
+      } else {
+        res.set("Cache-Control", "public, max-age=3600");
+      }
+    },
+  })
+);
+// Unknown paths inside the app (e.g. a refreshed page) load the app itself.
+app.get(/^\/app\/(?!assets\/|canvaskit\/).*$/, webAppRules, (req, res, next) => {
+  const index = path.join(webAppDir, "index.html");
+  res.sendFile(index, (error) => {
+    if (error) next();
+  });
+});
+
 app.get('/api/health', async (req, res) => {
   try {
     await sequelize.authenticate();

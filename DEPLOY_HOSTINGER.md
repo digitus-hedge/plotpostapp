@@ -136,7 +136,22 @@ cd frontend
 flutter build apk --release --dart-define=GOOGLE_SERVER_CLIENT_ID=<web client id>
 ```
 
-## 9. Updating later
+## 9. The app for computers (https://plotpost.hedge-group.com/app/)
+
+The same server also hosts PlotPost for browsers, in the `webapp` folder next
+to `server.js`. To make or update it:
+
+```
+cd frontend
+flutter build web --release --base-href /app/ --no-web-resources-cdn
+```
+
+Then replace `backend/webapp` with `frontend/build/web` and upload that
+folder to Hostinger (plus `server.js` if it changed), and **Restart**. In Git
+Bash, put `MSYS_NO_PATHCONV=1 ` in front of the `flutter` command, or the
+`/app/` path gets mangled.
+
+## 10. Updating later
 
 - **Server:** upload the changed files (or a new zip), keep `.env`, then
   **Install dependencies** if `package.json` changed, and **Restart**.

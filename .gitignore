@@ -14,3 +14,6 @@ backups/
 node_modules
 .env
 *.zip
+
+# Flutter web build (made from frontend/, copied in for deploys)
+webapp/

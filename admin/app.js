@@ -1,5 +1,5 @@
 // PlotPost admin panel. Plain JavaScript, no build step. Talks to /api/admin.
-// Look and layout follow PlotPost_Admin_Panel_Refined.html. Everything that
+// Look follows the Supertainer role page (gradient banner, white cards, Light/Vibrant). Everything that
 // comes from the server is escaped with esc() before it goes into the page,
 // and no inline styles are written (the page's security policy blocks them).
 (() => {
@@ -8,6 +8,7 @@
   const API = "/api";
   const TOKEN_KEY = "plotpost_admin_token";
   const THEME_KEY = "plotpost_admin_theme";
+  const LOOK_KEY = "plotpost_admin_look";
   const TARGET = 3000; // launch target for live posts
 
   // ------------------------------------------------------------ helpers
@@ -367,6 +368,7 @@
     $("#me-pill").setAttribute("aria-label", `Signed in as ${S.me.name || S.me.email}, admin`);
     $("#login-view").hidden = true;
     $("#app-view").hidden = false;
+    syncLook();
     route();
   };
 
@@ -431,6 +433,7 @@
     const view = VIEWS[S.current];
     $("#vt").textContent = view.t;
     $("#vs").textContent = view.s();
+    $("#phead").classList.toggle("dash", S.current === "dashboard");
     document.title = `${view.t} · PlotPost Admin Panel`;
     closeDrawer();
     $("#content").innerHTML = view.shell();
@@ -527,6 +530,33 @@
     box.innerHTML = dashboardHtml(summary, groups);
     applySizes(box);
     bindChart();
+    if (S.current === "dashboard") dashHeadline(summary);
+  };
+
+  // The dashboard banner leads with what needs doing, not just "Dashboard".
+  const dashHeadline = (s) => {
+    const open = Number(s.openReports) || 0;
+    const late = Number(s.overdueReports) || 0;
+    const oldest = s.oldestOpenHours;
+    let title;
+    let sub;
+    if (late) {
+      title = `${plural(late, "report")} ${late === 1 ? "has" : "have"} waited more than 24 hours`;
+      sub = `${plural(open, "open report")}, the oldest waiting ${fmt(oldest)} hours. Clear those first. ${todayLong()}.`;
+    } else if (open) {
+      title = `${plural(open, "open report")}, all inside 24 hours`;
+      sub = `The oldest has waited ${fmt(oldest)} hours. ${todayLong()}.`;
+    } else {
+      title = "The report queue is clear";
+      sub = `${todayLong()}. Kerala launch, Kozhikode focus.`;
+    }
+    $("#vt").textContent = title;
+    $("#vs").textContent = sub;
+  };
+
+  const syncLook = () => {
+    const look = document.documentElement.dataset.look === "vibrant" ? "vibrant" : "light";
+    for (const b of document.querySelectorAll('[data-act="look"]')) b.setAttribute("aria-pressed", String(b.dataset.look === look));
   };
 
   const dashboardHtml = (s, groups) => {
@@ -635,7 +665,7 @@
               <div class="xaxis"><span>${days[0] ? esc(dayLabel(days[0].day, false)) : ""}</span><span>${mid ? esc(dayLabel(mid.day, false)) : ""}</span><span>Today</span></div>
               <div class="tip" id="tip"></div>
             </div>
-            <p class="help mt">* Today so far. The red bar is the busiest of the 13 days before. Hover a bar for the exact count.</p>
+            <p class="help mt">* Today so far. The dark bar is the busiest of the 13 days before. Hover a bar for the exact count.</p>
             <details class="data"><summary>Show as table</summary><table><thead><tr><th>Day</th><th class="num">New posts</th></tr></thead><tbody>${days
               .map((d) => `<tr><td>${esc(dayLabel(d.day))}</td><td class="num">${fmt(d.count)}</td></tr>`)
               .join("")}</tbody></table></details>
@@ -645,7 +675,38 @@
           <p class="help">Agent verification, locations and district numbers come later. For now this page shows totals for all of PlotPost: ${plural(s.posts, "post")} in total, ${fmt(s.removedPosts)} removed.</p>
         </div>
       </div>
-    </div>`;
+    </div>
+    <h2 class="sec-t">Guided journeys</h2>
+    <div class="jour">
+      <section class="card"><b>Clear the report queue</b><div class="help">Oldest first, each one inside 24 hours</div>
+        <ol><li>Open Reports; the oldest is at the top</li><li>Read what people said and check the post</li><li>Keep, remove or ban, with a reason</li><li>Find your decision in the Audit log</li></ol>
+        <a class="btn" href="#reports" data-act="goReports" data-kind="all">Start this journey</a></section>
+      <section class="card"><b>Check a seller</b><div class="help">Before or after a ban</div>
+        <ol><li>Search People by name, email or phone</li><li>Open their account</li><li>Look at their posts, reports and past actions</li><li>Ban or unban, with a reason</li></ol>
+        <a class="btn" href="#people">Start this journey</a></section>
+    </div>
+    <h2 class="sec-t">All screens</h2>
+    <div class="tiles">${screenTiles(s)}</div>`;
+  };
+
+  const screenTiles = (s) => {
+    const preview = (kind) =>
+      kind === "dash"
+        ? `<div class="tv" aria-hidden="true"><div class="hb"></div><div class="bx">${[5, 8, 6, 9, 7, 11, 10].map((v) => `<i data-h="${v * 9}"></i>`).join("")}</div></div>`
+        : '<div class="tv" aria-hidden="true"><div class="hb"></div><div class="r"></div><div class="r w85"></div><div class="r"></div><div class="r w70"></div></div>';
+    const tile = (href, kind, label, note) =>
+      `<a class="card tile" href="${href}">${preview(kind)}<span class="tl">${esc(label)}<em>${esc(note)}</em></span></a>`;
+    const later = (label) => `<div class="card tile off">${preview("list")}<span class="tl">${esc(label)}<em>Later</em></span></div>`;
+    return [
+      tile("#dashboard", "dash", "Dashboard", ""),
+      tile("#reports", "list", "Reports", `${fmt(s.openReports)} open`),
+      tile("#posts", "list", "Posts", `${fmt(s.activePosts)} live`),
+      tile("#people", "list", "People", fmt(s.users)),
+      tile("#audit", "list", "Audit log", ""),
+      later("Agent verification"),
+      later("Locations"),
+      later("District analytics"),
+    ].join("");
   };
 
   const bindChart = () => {
@@ -790,17 +851,17 @@
             : `data-kind="post" data-post="${esc(g.postId || "")}"`;
       buttons.push(`<button type="button" class="btn" data-act="dismiss" ${dismissData}>${g.kind === "user" ? "Keep account" : g.kind === "comment" ? "Keep comment" : "Keep post"}</button>`);
       if (g.kind === "post" && p && !p.removed) {
-        buttons.push(`<button type="button" class="btn primary" data-act="removePost" data-post="${esc(p._id)}">Remove post</button>`);
+        buttons.push(`<button type="button" class="btn danger" data-act="removePost" data-post="${esc(p._id)}">Remove post</button>`);
       }
       if (g.kind === "post" && p?.removed) {
         buttons.push(`<button type="button" class="btn" data-act="restorePost" data-post="${esc(p._id)}">Restore post</button>`);
       }
       if (g.kind === "comment" && g.postId && g.comment?._id) {
-        buttons.push(`<button type="button" class="btn primary" data-act="removeComment" data-post="${esc(g.postId)}" data-comment="${esc(g.comment._id)}">Remove comment</button>`);
+        buttons.push(`<button type="button" class="btn danger" data-act="removeComment" data-post="${esc(g.postId)}" data-comment="${esc(g.comment._id)}">Remove comment</button>`);
       }
       if (canBan(person)) {
         buttons.push(
-          `<button type="button" class="btn danger" data-act="ban" data-user="${esc(person._id)}" data-name="${esc(person.name)}">Ban ${g.kind === "post" ? "seller" : g.kind === "comment" ? "author" : "account"}</button>`
+          `<button type="button" class="btn dangerfill" data-act="ban" data-user="${esc(person._id)}" data-name="${esc(person.name)}">Ban ${g.kind === "post" ? "seller" : g.kind === "comment" ? "author" : "account"}</button>`
         );
       }
     }
@@ -1006,7 +1067,7 @@
       : '<p class="help">No admin actions yet.</p>';
     let foot = "";
     if (canBan(u)) {
-      foot = `<button type="button" class="btn danger" data-act="ban" data-user="${esc(u._id)}" data-name="${esc(u.name)}">Ban account</button>`;
+      foot = `<button type="button" class="btn dangerfill" data-act="ban" data-user="${esc(u._id)}" data-name="${esc(u.name)}">Ban account</button>`;
     } else if (u.banned) {
       foot = `<button type="button" class="btn" data-act="unban" data-user="${esc(u._id)}" data-name="${esc(u.name)}">Unban</button>`;
     } else if (u.role === "admin") {
@@ -1127,6 +1188,13 @@
       const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
       root.dataset.theme = dark ? "light" : "dark";
       store.set("localStorage", THEME_KEY, root.dataset.theme);
+    },
+    look: (d) => {
+      const root = document.documentElement;
+      if (d.look === "vibrant") root.dataset.look = "vibrant";
+      else delete root.dataset.look;
+      store.set("localStorage", LOOK_KEY, d.look === "vibrant" ? "vibrant" : null);
+      syncLook();
     },
     closeDrawer: () => closeDrawer(),
     cancelModal: () => finishModal(null),
