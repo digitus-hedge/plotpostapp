@@ -910,7 +910,7 @@
       ? `<a class="plat" href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="Open the original post">${esc(p.platform || "PlotPost")}${icon("ext", "s14")}</a>`
       : plat(p.platform);
     return `<tr>
-      <td class="t-title">${esc(p.title || "Untitled post")}<div class="t-meta">${platform} <span class="mono" title="${esc(p._id)}">…${esc(String(p._id).slice(-6))}</span> · ${esc(p.location)}</div></td>
+      <td class="t-title"><button type="button" class="plink" data-act="openPost" data-id="${esc(p._id)}">${esc(p.title || "Untitled post")}</button><div class="t-meta">${platform} <span class="mono" title="${esc(p._id)}">…${esc(String(p._id).slice(-6))}</span> · ${esc(p.location)}</div></td>
       <td class="nowrap">${esc(p.type)}<div class="t-meta">${esc(p.deal)}</div></td>
       <td>${
         p.seller
@@ -1031,7 +1031,8 @@
     openDrawer(userDrawer(data), { type: "user", id });
   };
 
-  const userDrawer = ({ user: u, posts, reports, actions }) => {
+  const userDrawer = ({ user: u, posts, postsTotal, reports, actions }) => {
+    const total = Number.isFinite(postsTotal) ? postsTotal : posts.length;
     const live = posts.filter((p) => !p.removed && !p.sellerBanned && p.status === "active" && !p.expired).length;
     const removed = posts.filter((p) => p.removed).length;
     const views = posts.reduce((n, p) => n + (p.views || 0), 0);
@@ -1039,7 +1040,7 @@
     const postList = posts.length
       ? `<div class="mini">${posts
           .map(
-            (p) => `<div>${plat(p.platform)}<span class="grow">${esc(p.title || "Untitled post")}<br><span class="t-meta">${esc(p.location)} · ${esc(ago(p.createdAt))}${
+            (p) => `<div>${plat(p.platform)}<span class="grow"><button type="button" class="plink" data-act="openPost" data-id="${esc(p._id)}" data-from="${esc(u._id)}">${esc(p.title || "Untitled post")}</button><br><span class="t-meta">${esc(p.location)} · ${esc(ago(p.createdAt))}${
               p.removed && p.removedReason ? ` · ${esc(p.removedReason)}` : ""
             }</span></span>${postPill(p)}<span class="acts">${
               p.removed
@@ -1087,17 +1088,101 @@
           <dt>Account ID</dt><dd class="mono">${esc(u._id)}</dd>
         </dl></div>
         <div class="sec"><h3>Activity</h3><div class="stats">
-          <div><b>${fmt(posts.length)}</b><span>Posts</span></div>
+          <div><b>${fmt(total)}</b><span>Posts</span></div>
           <div><b>${fmt(live)}</b><span>Live</span></div>
           <div><b>${fmt(removed)}</b><span>Removed</span></div>
           <div><b>${fmt(views)}</b><span>Views</span></div>
           <div><b>${fmt(openReports)}</b><span>Open reports</span></div>
         </div></div>
-        <div class="sec"><h3>Posts (${fmt(posts.length)})</h3>${postList}</div>
+        <div class="sec"><h3>Posts (${fmt(total)})</h3>${
+          total > posts.length ? `<p class="help">Showing the newest ${fmt(posts.length)}. Live, removed and views count these only.</p>` : ""
+        }${posts.length ? '<p class="help">Click a post to see it in full.</p>' : ""}${postList}</div>
         <div class="sec"><h3>Reports about them (${fmt(reports.length)})</h3>${reportList}</div>
         <div class="sec"><h3>Admin actions</h3>${actionList}</div>
       </div>
       ${foot ? `<div class="drawer-f">${foot}</div>` : ""}`;
+  };
+
+  // ------------------------------------------------------------ one post, in full
+
+  // [from] is the account the post was opened from, for "Back to account".
+  const openPost = async (id, from) => {
+    const head = `<div class="drawer-h"><h2>Post</h2><button type="button" class="btn ghost sm x" data-act="closeDrawer" aria-label="Close">${icon("close")}</button></div>`;
+    openDrawer(`${head}<div class="drawer-b"><div class="empty">Loading…</div></div>`, { type: "post", id, from });
+    let data;
+    try {
+      data = await api(`/admin/posts/${encodeURIComponent(id)}`);
+    } catch (error) {
+      if (S.drawer?.type === "post" && S.drawer.id === id) $(".drawer-b", $("#drawer")).innerHTML = failBox(error);
+      return;
+    }
+    if (S.drawer?.type !== "post" || S.drawer.id !== id) return;
+    openDrawer(postDrawer(data.post, from), { type: "post", id, from });
+  };
+
+  const postDrawer = (p, from) => {
+    const images = (p.images || []).map(httpsUrl).filter(Boolean);
+    const poster = httpsUrl(p.videoPoster);
+    const video = webUrl(p.videoUrl);
+    const link = webUrl(p.socialUrl);
+    const gallery = images.length
+      ? `<div class="gal">${images
+          .map((src, i) => `<a href="${esc(src)}" target="_blank" rel="noopener noreferrer" title="Open photo ${i + 1} full size"><img src="${esc(src)}" alt="Photo ${i + 1} of ${images.length}" loading="lazy"></a>`)
+          .join("")}</div>`
+      : "";
+    const videoBox = video
+      ? `<div class="sec"><h3>Video</h3>${poster ? `<img class="pc-img" src="${esc(poster)}" alt="Video cover">` : ""}<div><a class="btn sm" href="${esc(video)}" target="_blank" rel="noopener noreferrer">Open video ${icon("ext", "s14")}</a></div></div>`
+      : "";
+    const row = (label, value) => (value || value === 0 ? `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>` : "");
+    const text = [p.caption, p.description].filter((t) => String(t || "").trim());
+    const comments = p.comments || [];
+    const commentList = comments.length
+      ? `<div class="notes">${comments
+          .map(
+            (c) => `<div class="note">${esc(c.text) || "No text saved"}<div class="meta">${esc(c.name)} · ${esc(ago(c.at))}${
+              c._id
+                ? ` · <button type="button" class="btn ghost sm flush" data-act="removeComment" data-post="${esc(p._id)}" data-comment="${esc(c._id)}">Remove</button>`
+                : ""
+            }</div></div>`
+          )
+          .join("")}</div>`
+      : '<p class="help">No comments.</p>';
+    const seller = p.seller
+      ? `${personRow(p.seller)}${
+          String(p.seller._id) === String(from) ? "" : `<div><button type="button" class="btn sm" data-act="openUser" data-id="${esc(p.seller._id)}">View account</button></div>`
+        }`
+      : '<p class="help">This account was deleted.</p>';
+    const foot = p.removed
+      ? `<button type="button" class="btn" data-act="restorePost" data-post="${esc(p._id)}">Restore post</button>`
+      : `<button type="button" class="btn danger" data-act="removePost" data-post="${esc(p._id)}">Remove post</button>`;
+    return `
+      <div class="drawer-h"><h2>Post</h2><button type="button" class="btn ghost sm x" data-act="closeDrawer" aria-label="Close">${icon("close")}</button></div>
+      <div class="drawer-b">
+        ${from ? `<div><button type="button" class="btn ghost sm flush" data-act="openUser" data-id="${esc(from)}">← Back to account</button></div>` : ""}
+        <div class="chiprow">${postPill(p)} ${plat(p.platform)}</div>
+        ${p.removed ? `<div class="banner warn"><span class="ic">${icon("alert")}</span><span class="txt">Removed by an admin.<small>${esc(p.removedReason || "No reason saved.")}</small></span></div>` : ""}
+        <div class="sec"><h3>${esc(p.title || "Untitled post")}</h3>${p.price ? `<p class="pc-t">${esc(p.price)}</p>` : ""}${gallery}${
+          link ? `<div><a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener noreferrer">View on ${esc(p.platform || "the original site")} ${icon("ext", "s14")}</a></div>` : ""
+        }</div>
+        ${videoBox}
+        ${text.length ? `<div class="sec"><h3>What the seller wrote</h3>${text.map((t) => `<p class="ptext">${esc(t)}</p>`).join("")}</div>` : ""}
+        <div class="sec"><h3>Details</h3><dl class="dl">
+          ${row("Type", p.type)}${row("Deal", p.deal)}${row("Price", p.price)}${row("Location", p.location)}${row("Area", p.area)}${row("Bedrooms", p.bedrooms)}${row("Bathrooms", p.bathrooms)}
+          ${row("Name on post", p.sellerName)}${row("Phone on post", p.sellerPhone)}
+          ${row("Posted", when(p.createdAt))}${p.expiresAt && p.status === "active" ? row(p.expired ? "Expired" : "Expires", when(p.expiresAt)) : ""}
+          <dt>Post ID</dt><dd class="mono">${esc(p._id)}</dd>
+        </dl></div>
+        <div class="sec"><h3>Activity</h3><div class="stats">
+          <div><b>${fmt(p.views)}</b><span>Views</span></div>
+          <div><b>${fmt(p.likes)}</b><span>Likes</span></div>
+          <div><b>${fmt(comments.length)}</b><span>Comments</span></div>
+          <div><b>${fmt(p.calls)}</b><span>Calls</span></div>
+          <div><b>${fmt(p.shares)}</b><span>Shares</span></div>
+        </div></div>
+        <div class="sec"><h3>Seller</h3>${seller}</div>
+        <div class="sec"><h3>Comments (${fmt(comments.length)})</h3>${commentList}</div>
+      </div>
+      <div class="drawer-f">${foot}</div>`;
   };
 
   // ------------------------------------------------------------ audit
@@ -1155,6 +1240,7 @@
   const refreshAfterAction = async () => {
     if (S.drawer?.type === "report") closeDrawer();
     if (S.drawer?.type === "user") openUser(S.drawer.id);
+    if (S.drawer?.type === "post") openPost(S.drawer.id, S.drawer.from);
     VIEWS[S.current].load(true);
     if (S.current !== "dashboard" && S.current !== "reports") {
       try {
@@ -1224,6 +1310,7 @@
     },
     openReport: (d) => openReport(d.key),
     openUser: (d) => openUser(d.id),
+    openPost: (d) => openPost(d.id, d.from || ""),
 
     removePost: async (d, el) => {
       const reason = await askReason({

@@ -1,68 +1,49 @@
-// Backs up the PlotPost database into backups/<date_time>/ (one compressed
-// file per collection), then deletes backups older than 30 days, because the
-// privacy policy says backups are kept for 30 days at most.
+// Backs up the PlotPost MySQL database into backups/<date_time>/ (one
+// compressed file per table), then deletes backups older than 30 days,
+// because the privacy policy says backups are kept for 30 days at most.
 //
-//   npm run backup                                uses BACKUP_MONGODB_URI, or else MONGODB_URI, from .env
-//   npm run backup -- --uri "mongodb+srv://..."   a different database
-//   npm run backup -- --out "D:\PlotPost backups" a different folder
+//   npm run backup                                 the database in .env (MYSQL_*)
+//   npm run backup -- --database plotpost_copy     a different database on the same server
+//   npm run backup -- --out "D:\PlotPost backups"  a different folder
 //
-// Only reads from the database. Best with a read-only Atlas user (see
-// DEPLOY_GUIDE.md). The backups hold people's personal data: keep the folder
-// private, and never upload it or put it in Git (backups/ is in .gitignore).
-require("dotenv").config({ quiet: true });
-const dns = require("dns");
+// Only reads from the database. The backups hold people's personal data:
+// keep the folder private, and never upload it or put it in Git (backups/ is
+// in .gitignore).
 const path = require("path");
-const mongoose = require("mongoose");
-const { backupDatabase, pruneOldBackups, hidePassword, KEEP_DAYS } = require("../utils/dbBackup");
-const { describeMongoUri } = require("../config/startupReport");
 
 const argValue = (args, name) => {
   const at = args.indexOf(name);
   return at >= 0 ? args[at + 1] : undefined;
 };
 
+const args = process.argv.slice(2);
+// Must be set before the database settings are read.
+if (argValue(args, "--database")) process.env.MYSQL_DATABASE = argValue(args, "--database");
+
+const db = require("./scriptDb");
+const { backupDatabase, pruneOldBackups, KEEP_DAYS } = require("../utils/dbBackup");
+
 const run = async () => {
-  const args = process.argv.slice(2);
-  const uri = argValue(args, "--uri") || process.env.BACKUP_MONGODB_URI || process.env.MONGODB_URI;
   const root = path.resolve(argValue(args, "--out") || path.join(__dirname, "..", "backups"));
-  if (!uri) {
-    console.error("No database address: set BACKUP_MONGODB_URI (or MONGODB_URI) in .env, or pass --uri.");
-    process.exit(1);
-  }
-  const { database } = describeMongoUri(uri);
-  if (!database) {
-    console.error("The database address has no database name (…mongodb.net/plotpost?…). Add it and try again.");
-    process.exit(1);
-  }
 
-  // Same Windows DNS fix as server.js (mongodb+srv lookups).
-  try {
-    dns.setServers(["1.1.1.1", "8.8.8.8"]);
-  } catch (error) {
-    // ignore
-  }
-
-  console.log(`Backing up ${hidePassword(uri)}`);
-  const client = new mongoose.mongo.MongoClient(uri, { serverSelectionTimeoutMS: 10000 });
-  try {
-    await client.connect();
-    const started = Date.now();
-    const { folder, manifest } = await backupDatabase(client.db(), root);
-    const total = Object.values(manifest.collections).reduce((a, b) => a + b, 0);
-    console.log(
-      `Done in ${((Date.now() - started) / 1000).toFixed(1)} s: ${total} documents from ${Object.keys(manifest.collections).length} collections.`
-    );
-    for (const [name, count] of Object.entries(manifest.collections)) console.log(`  ${name}: ${count}`);
-    console.log(`Saved in ${folder}`);
-  } finally {
-    await client.close();
-  }
+  console.log(`Backing up ${db.describe()}`);
+  const sequelize = await db.open();
+  const started = Date.now();
+  const { folder, manifest } = await backupDatabase(sequelize, root);
+  const total = Object.values(manifest.tables).reduce((a, b) => a + b, 0);
+  console.log(
+    `Done in ${((Date.now() - started) / 1000).toFixed(1)} s: ${total} rows from ${Object.keys(manifest.tables).length} tables.`
+  );
+  for (const [name, count] of Object.entries(manifest.tables)) console.log(`  ${name}: ${count}`);
+  console.log(`Saved in ${folder}`);
 
   const removed = pruneOldBackups(root);
   if (removed.length) console.log(`Deleted ${removed.length} backup(s) older than ${KEEP_DAYS} days: ${removed.join(", ")}`);
 };
 
-run().catch((error) => {
-  console.error(`Backup failed: ${error.message}`);
-  process.exit(1);
-});
+run()
+  .catch((error) => {
+    console.error(`Backup failed: ${error.message}`);
+    process.exitCode = 1;
+  })
+  .finally(() => db.close());

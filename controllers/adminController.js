@@ -1,4 +1,4 @@
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
 const { Post, User, Report, AdminAction } = require("../models");
 const notifications = require("../services/notificationService");
 const push = require("../services/pushService");
@@ -281,6 +281,49 @@ const getPosts = async (req, res) => {
   });
 };
 
+// One post in full, for the admin panel's post view: every photo, the
+// video, the text, the details, the seller and the comments.
+const getPost = async (req, res) => {
+  const post = await Post.findByPk(req.params.id, {
+    include: [{ model: User, as: "user", attributes: ["id", "name", "email", "phone", "role", "bannedAt"] }],
+  });
+  if (!post) return res.status(404).json({ success: false, message: "Post not found." });
+
+  const images = [...(post.imageUrls || []), post.imageUrl || ""].map(webPhoto).filter(Boolean);
+  const comments = (post.comments || []).map((c) => ({
+    _id: String(c.id || c._id || ""),
+    name: c.user?.name || "Someone",
+    userId: c.user?.id ?? null,
+    text: String(c.text ?? ""),
+    at: c.createdAt || null,
+  }));
+  const stats = post.stats || {};
+
+  res.status(200).json({
+    success: true,
+    post: {
+      ...postSummary(post),
+      images: [...new Set(images)],
+      videoUrl: webPhoto(post.videoUrl),
+      videoPoster: webPhoto(post.videoPoster),
+      caption: post.caption || "",
+      description: post.description || "",
+      area: post.area || "",
+      bedrooms: post.bedrooms || "",
+      bathrooms: post.bathrooms || "",
+      sellerName: post.sellerName || "",
+      sellerPhone: post.sellerPhone || "",
+      likes: Array.isArray(post.likes) ? post.likes.length : 0,
+      calls: Number(stats.calls) || 0,
+      linkOpens: Number(stats.linkOpens) || 0,
+      shares: Number(stats.shares) || 0,
+      updatedAt: post.updatedAt,
+      seller: personSummary(post.user),
+      comments,
+    },
+  });
+};
+
 const getUsers = async (req, res) => {
   const page = pageOf(req);
   const offset = (page - 1) * PAGE_SIZE;
@@ -290,6 +333,18 @@ const getUsers = async (req, res) => {
     limit: PAGE_SIZE,
     offset,
   });
+
+  // How many posts each person on this page has made (all of them, removed included).
+  const postCounts = new Map();
+  if (users.length) {
+    const rows = await Post.findAll({
+      attributes: ["userId", [fn("COUNT", col("id")), "count"]],
+      where: { userId: users.map((user) => user.id) },
+      group: ["userId"],
+      raw: true,
+    });
+    for (const row of rows) postCounts.set(String(row.userId), Number(row.count) || 0);
+  }
 
   res.status(200).json({
     success: true,
@@ -302,17 +357,22 @@ const getUsers = async (req, res) => {
       bannedAt: user.bannedAt,
       banReason: user.banReason || "",
       createdAt: user.createdAt,
-      posts: 0,
+      posts: postCounts.get(String(user.id)) || 0,
       openReports: 0,
     })),
   });
 };
 
+const POSTS_PER_PERSON = 100;
+
 const getUser = async (req, res) => {
   const user = await User.findByPk(req.params.id);
   if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-  const posts = await Post.findAll({ where: { userId: user.id }, limit: 100 });
+  const [posts, postsTotal] = await Promise.all([
+    Post.findAll({ where: { userId: user.id }, order: [["createdAt", "DESC"]], limit: POSTS_PER_PERSON }),
+    Post.count({ where: { userId: user.id } }),
+  ]);
   const reports = await Report.findAll({ where: { reportedUser: user.id }, limit: 50 });
   const actions = await AdminAction.findAll({ where: { user: user.id }, limit: 50 });
 
@@ -329,6 +389,7 @@ const getUser = async (req, res) => {
       bio: user.bio || "",
     },
     posts: posts.map((post) => ({ ...postSummary(post), createdAt: post.createdAt })),
+    postsTotal,
     reports: reports.map((r) => ({
       _id: r.id,
       kind: r.kind,
@@ -442,6 +503,7 @@ module.exports = {
   restorePost,
   removeComment,
   getPosts,
+  getPost,
   getUsers,
   getUser,
   banUser,

@@ -441,3 +441,11 @@ a.plat:hover{color:var(--accent);background:var(--accent-bg)}
 }
 /* The PlotPost app icon (icon.png) in place of the "p." badge. */
 img.mark{display:block;object-fit:cover;background:#fff;box-shadow:0 1px 3px rgba(31,34,56,.12)}
+/* One post in full (side panel): photo grid, the seller's text, clickable titles. */
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.gal a{display:block;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--well)}
+.gal img{display:block;width:100%;height:100%;object-fit:cover}
+.ptext{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.55}
+.plink{all:unset;cursor:pointer;font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.plink:hover{text-decoration:underline}
+.plink:focus-visible{outline:2px solid var(--g2);outline-offset:2px;border-radius:4px}

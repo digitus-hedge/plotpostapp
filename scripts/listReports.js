@@ -1,33 +1,47 @@
-// Lists reported posts, so you can review them.
+// Lists reported posts, comments and accounts, so you can review them.
+// (The admin panel at /admin does the same with buttons; this is for the
+// command line.)
 //
 //   node scripts/listReports.js                 open reports, most-reported post first
 //   node scripts/listReports.js --all           also the ones marked done
 //   node scripts/listReports.js --done <postId> mark every report on that post done
 //   node scripts/listReports.js --done-report <reportId>  mark one comment/account report done
 //
-// Only --done changes anything (it sets status "done" on those reports).
-// Posts are never hidden or deleted by this script.
+// Only --done and --done-report change anything (they set status "done" on
+// those reports). Posts are never hidden or deleted by this script.
 
-const mongoose = require("mongoose");
-const Report = require("../models/Report");
-require("../models/Post");
-require("../models/User");
+const { Op } = require("sequelize");
+const { Report, Post, User } = require("../models");
 
-// Works on the current mongoose connection. Returns the groups it printed.
-const POST_REPORTS = { kind: { $in: ["post", null] } };
+const POST_REPORTS = { [Op.or]: [{ kind: "post" }, { kind: null }] };
+const PERSON = ["id", "name", "email", "phone"];
 
+const stamp = (date) => new Date(date).toISOString().slice(0, 16).replace("T", " ");
+const whoIs = (user) => (user ? `${user.name} <${user.email}>` : "(account deleted)");
+const isId = (value) => /^\d+$/.test(String(value ?? ""));
+
+// Reports about posts, one group per post, most-reported first.
+// Returns the groups it printed.
 const listReports = async ({ all = false, log = console.log } = {}) => {
-  const reports = await Report.find(all ? POST_REPORTS : { ...POST_REPORTS, status: "open" })
-    .sort({ createdAt: -1 })
-    .populate({ path: "post", select: "title location price user", populate: { path: "user", select: "name email phone" } })
-    .populate("reporter", "name email")
-    .lean();
+  const reports = await Report.findAll({
+    where: all ? POST_REPORTS : { ...POST_REPORTS, status: "open" },
+    order: [["createdAt", "DESC"]],
+    include: [
+      {
+        model: Post,
+        as: "postItem",
+        attributes: ["id", "title", "location", "price", "userId"],
+        include: [{ model: User, as: "user", attributes: PERSON }],
+      },
+      { model: User, as: "reporterUser", attributes: PERSON },
+    ],
+  });
 
-  // One group per post.
   const groups = new Map();
   for (const report of reports) {
-    const key = String(report.post?._id ?? "deleted");
-    if (!groups.has(key)) groups.set(key, { post: report.post, postId: report.post?._id, reports: [] });
+    const post = report.postItem;
+    const key = post ? String(post.id) : `deleted-${report.post ?? "?"}`;
+    if (!groups.has(key)) groups.set(key, { post, postId: post?.id ?? report.post, reports: [] });
     groups.get(key).reports.push(report);
   }
   const sorted = [...groups.values()].sort((a, b) => b.reports.length - a.reports.length);
@@ -41,17 +55,15 @@ const listReports = async ({ all = false, log = console.log } = {}) => {
 
   for (const { post, postId, reports: list } of sorted) {
     log("");
-    log(post ? `POST ${postId}  "${post.title}"` : "POST (deleted since)");
+    log(post ? `POST ${postId}  "${post.title}"` : `POST ${postId ?? ""} (deleted since)`);
     if (post) {
       log(`  ${post.location || "No location"} · ${post.price || "No price"}`);
       const seller = post.user;
-      log(`  Seller: ${seller ? `${seller.name} <${seller.email}>${seller.phone ? ` ${seller.phone}` : ""}` : "(account deleted)"}`);
+      log(`  Seller: ${seller ? `${whoIs(seller)}${seller.phone ? ` ${seller.phone}` : ""}` : "(account deleted)"}`);
     }
     log(`  ${list.length} ${list.length === 1 ? "report" : "reports"}:`);
     for (const report of list) {
-      const who = report.reporter ? `${report.reporter.name} <${report.reporter.email}>` : "(account deleted)";
-      const when = new Date(report.updatedAt || report.createdAt).toISOString().slice(0, 16).replace("T", " ");
-      log(`  - [${report.status}] ${report.reason} · by ${who} · ${when} UTC`);
+      log(`  - [${report.status}] ${report.reason} · by ${whoIs(report.reporterUser)} · ${stamp(report.updatedAt || report.createdAt)} UTC`);
       if (report.details) log(`      "${report.details}"`);
     }
   }
@@ -63,70 +75,64 @@ const listReports = async ({ all = false, log = console.log } = {}) => {
 
 // Reports about comments and accounts, newest first (printed before the posts).
 const listPersonReports = async ({ all = false, log = console.log } = {}) => {
-  const filter = { kind: { $in: ["comment", "user"] }, ...(all ? {} : { status: "open" }) };
-  const reports = await Report.find(filter)
-    .sort({ updatedAt: -1 })
-    .populate("reportedUser", "name email phone")
-    .populate("reporter", "name email")
-    .populate("post", "title")
-    .lean();
+  const reports = await Report.findAll({
+    where: { kind: { [Op.in]: ["comment", "user"] }, ...(all ? {} : { status: "open" }) },
+    order: [["updatedAt", "DESC"]],
+    include: [
+      { model: User, as: "targetUser", attributes: PERSON },
+      { model: User, as: "reporterUser", attributes: PERSON },
+      { model: Post, as: "postItem", attributes: ["id", "title"] },
+    ],
+  });
   if (!reports.length) return reports;
   log("");
   log(`COMMENTS AND ACCOUNTS (${reports.length})`);
   for (const report of reports) {
-    const about = report.reportedUser
-      ? `${report.reportedUser.name} <${report.reportedUser.email}>`
-      : "(account deleted)";
-    const who = report.reporter ? `${report.reporter.name} <${report.reporter.email}>` : "(account deleted)";
-    const when = new Date(report.updatedAt || report.createdAt).toISOString().slice(0, 16).replace("T", " ");
-    log(`- REPORT ${report._id} [${report.status}] ${report.kind === "comment" ? "Comment" : "Account"} by ${about}`);
+    log(`- REPORT ${report.id} [${report.status}] ${report.kind === "comment" ? "Comment" : "Account"} by ${whoIs(report.targetUser)}`);
     if (report.kind === "comment") {
-      log(`    On "${report.post?.title ?? "(post deleted)"}": "${report.commentText}"`);
+      log(`    On "${report.postItem?.title ?? "(post deleted)"}": "${report.commentText}"`);
     }
-    log(`    ${report.reason} · reported by ${who} · ${when} UTC`);
+    log(`    ${report.reason} · reported by ${whoIs(report.reporterUser)} · ${stamp(report.updatedAt || report.createdAt)} UTC`);
     if (report.details) log(`    "${report.details}"`);
   }
   return reports;
 };
 
+const closed = () => ({ status: "done", resolvedAt: new Date(), resolution: "dismissed" });
+
 // Marks one comment or account report done. Returns how many changed (0 or 1).
 const markReportDone = async (reportId, { log = console.log } = {}) => {
-  if (!mongoose.Types.ObjectId.isValid(reportId)) {
-    log("Please give a report ID, e.g. --done-report 665f1c2e9b1d4a0012345678");
+  if (!isId(reportId)) {
+    log("Please give a report ID (a number), e.g. --done-report 42");
     return 0;
   }
-  const result = await Report.updateOne({ _id: reportId, status: "open" }, { $set: { status: "done" } });
-  log(result.modifiedCount ? "Marked 1 report done." : "No open report with that ID.");
-  return result.modifiedCount;
+  const [count] = await Report.update(closed(), { where: { id: Number(reportId), status: "open" } });
+  log(count ? "Marked 1 report done." : "No open report with that ID.");
+  return count;
 };
 
 // Marks every report on one post done. Returns how many changed.
 const markDone = async (postId, { log = console.log } = {}) => {
-  if (!mongoose.Types.ObjectId.isValid(postId)) {
-    log("Please give a post ID, e.g. --done 665f1c2e9b1d4a0012345678");
+  if (!isId(postId)) {
+    log("Please give a post ID (a number), e.g. --done 17");
     return 0;
   }
-  const result = await Report.updateMany(
-    { ...POST_REPORTS, post: postId, status: "open" },
-    { $set: { status: "done" } }
-  );
-  log(`Marked ${result.modifiedCount} ${result.modifiedCount === 1 ? "report" : "reports"} done.`);
-  return result.modifiedCount;
+  const [count] = await Report.update(closed(), {
+    where: { ...POST_REPORTS, post: Number(postId), status: "open" },
+  });
+  log(`Marked ${count} ${count === 1 ? "report" : "reports"} done.`);
+  return count;
 };
 
 // Run from the command line with the backend's .env.
 if (require.main === module) {
-  require("dotenv").config();
+  const db = require("./scriptDb");
   const args = process.argv.slice(2);
   const doneIndex = args.indexOf("--done");
   const doneReportIndex = args.indexOf("--done-report");
 
   (async () => {
-    if (!process.env.MONGODB_URI) {
-      console.error("MONGODB_URI is not set in .env");
-      process.exit(1);
-    }
-    await mongoose.connect(process.env.MONGODB_URI);
+    await db.open();
     if (doneReportIndex !== -1) {
       await markReportDone(args[doneReportIndex + 1]);
     } else if (doneIndex !== -1) {
@@ -134,12 +140,12 @@ if (require.main === module) {
     } else {
       await listReports({ all: args.includes("--all") });
     }
-    await mongoose.disconnect();
-  })().catch(async (error) => {
-    console.error("Failed:", error.message);
-    await mongoose.disconnect().catch(() => {});
-    process.exit(1);
-  });
+  })()
+    .catch((error) => {
+      console.error("Failed:", error.message);
+      process.exitCode = 1;
+    })
+    .finally(() => db.close());
 }
 
 module.exports = { listReports, listPersonReports, markDone, markReportDone };

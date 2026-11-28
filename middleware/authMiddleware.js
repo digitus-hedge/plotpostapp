@@ -4,7 +4,7 @@ const { User } = require("../models");
 const sessionStillValid = (decoded, user) => (decoded.v || 0) === (user.tokenVersion || 0);
 
 const SUSPENDED_MESSAGE =
-  "This account has been suspended for breaking the PlotPost rules. Contact PlotPost support on WhatsApp +91 62356 49489.";
+  "This account has been suspended for breaking the PlotPost rules. Contact PlotPost support on WhatsApp +91 81296 62030.";
 
 const protect = async (req, res, next) => {
   try {

@@ -8,11 +8,9 @@
 //   node scripts/cleanupPhotos.js --days 7            only files older than 7 days (default 2)
 //   node scripts/cleanupPhotos.js --folder posts      only post photos (or: avatars, videos)
 //
-// Uses MONGODB_URI and the CLOUDINARY_* settings from .env. Photos of removed
+// Uses the MYSQL_* and CLOUDINARY_* settings from .env. Photos of removed
 // posts are kept (they can be restored). Deleted photos can't be brought back.
-require("dotenv").config();
-const dns = require("dns");
-const mongoose = require("mongoose");
+const db = require("./scriptDb");
 
 const run = async () => {
   const args = process.argv.slice(2);
@@ -30,18 +28,13 @@ const run = async () => {
   const folderArg = valueOf("--folder") || "all";
 
   const { config } = require("../config/env");
-  if (!process.env.MONGODB_URI) {
-    console.error("MONGODB_URI is not set in .env");
-    process.exit(1);
-  }
   if (!config.cloudinary.configured) {
     console.error("Cloudinary is not set up in .env (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).");
     process.exit(1);
   }
 
   const cloudinary = require("../config/cloudinary");
-  const Post = require("../models/Post");
-  const User = require("../models/User");
+  const { Post, User } = require("../models");
   const { cloudinaryPublicId } = require("../controllers/postController");
   const { FOLDERS, RESOURCE_TYPES, listFolder, usedPhotoIds, findUnused, deletePhotos } = require("../services/photoCleanup");
 
@@ -51,15 +44,9 @@ const run = async () => {
     process.exit(1);
   }
 
-  // Same Windows DNS fix as server.js (mongodb+srv lookups).
-  try {
-    dns.setServers(["1.1.1.1", "8.8.8.8"]);
-  } catch (error) {
-    // ignore
-  }
-  await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
+  await db.open();
 
-  console.log(`Database: ${mongoose.connection.name}. Cloudinary: ${config.cloudinary.cloudName}.`);
+  console.log(`Database: ${db.describe()}. Cloudinary: ${config.cloudinary.cloudName}.`);
   const used = await usedPhotoIds({ Post, User, publicIdOf: cloudinaryPublicId });
   console.log(`Photos the database uses: ${used.size}`);
 
@@ -84,7 +71,7 @@ const run = async () => {
   // wrong database in .env (deleting would wipe every photo).
   if (!used.size && photos.length && !force) {
     console.error("\nStopped: the database uses no photos at all, but Cloudinary has some.");
-    console.error("Check MONGODB_URI points to the real database. (--force deletes anyway.)");
+    console.error("Check the MYSQL_* settings in .env point to the real database. (--force deletes anyway.)");
     process.exitCode = 1;
     return;
   }
@@ -111,4 +98,4 @@ run()
     console.error("Clean-up failed:", error.message || error);
     process.exitCode = 1;
   })
-  .finally(() => mongoose.disconnect());
+  .finally(() => db.close());

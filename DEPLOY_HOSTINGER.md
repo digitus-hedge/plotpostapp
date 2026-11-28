@@ -160,3 +160,28 @@ Bash, put `MSYS_NO_PATHCONV=1 ` in front of the `flutter` command, or the
   only accept it if it's signed with the **same key**, so keep
   `upload-keystore.jks` and `key.properties` backed up somewhere safe
   (not only on this PC).
+
+## 11. Admin scripts
+
+They use the MySQL settings in `.env` (`MYSQL_*`). Run them in the backend
+folder: over SSH on Hostinger, or on your PC with `.env` pointing at the
+database you mean.
+
+| Command | What it does |
+|---|---|
+| `npm run make-admin -- you@example.com` | Makes that account an admin (`--remove` takes it away, `--list` shows the admins). |
+| `node scripts/listReports.js` | Lists open reports (`--all` includes closed ones). |
+| `node scripts/listReports.js --done <postId>` | Closes every report on that post (`--done-report <reportId>` closes one). |
+| `node scripts/backfillPostNumbers.js` | Shows which older posts lack the price, bedroom and size numbers the filters use. Add `--apply` to fill them in. |
+| `node scripts/cleanupPhotos.js` | Lists Cloudinary photos and videos no post or profile uses. Add `--apply` to delete them (this can't be undone). |
+| `npm run backup` | Saves every table to `backups/<date_time>/` and deletes backups older than 30 days. |
+| `npm run restore -- backups/<folder> --database <name>` | Puts a backup into that database. It must be empty unless you add `--replace`. |
+
+Only `--apply`, `--done`, `make-admin` and `restore` change anything; every
+other run just reports. Back up first (`npm run backup`) before `--apply` or
+`--replace`.
+
+To restore safely, create a new empty database in hPanel → Databases (for
+example `u123456789_restore`), restore into it and check it. Only then
+switch `MYSQL_DATABASE` in `.env` to that database. Backups hold people's
+personal data: keep them private, and never upload them or put them in Git.

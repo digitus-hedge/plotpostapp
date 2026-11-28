@@ -18,6 +18,7 @@ router.post("/reports/dismiss", validate(dismissSchema), admin.dismissReports);
 
 // Listings and comments.
 router.get("/posts", admin.getPosts);
+router.get("/posts/:id", admin.getPost);
 router.post("/posts/:id/remove", validate(reasonSchema), admin.removePost);
 router.post("/posts/:id/restore", validate(optionalReasonSchema), admin.restorePost);
 router.post("/posts/:id/comments/:commentId/remove", validate(reasonSchema), admin.removeComment);

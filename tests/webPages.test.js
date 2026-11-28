@@ -55,7 +55,7 @@ describe("public pages", () => {
     expect(html).toMatch(/href="\/delete-account"/);
     expect(html).toMatch(/12 months/);
     expect(html).toMatch(/90 days/);
-    expect(html).toMatch(/62356 49489/);
+    expect(html).toMatch(/81296 62030/);
     expect(html).not.toMatch(/January 2025/);
   });
 

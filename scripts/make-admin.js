@@ -1,5 +1,9 @@
-require("dotenv").config();
-const { connectDB, disconnectDB } = require("../config/db");
+// Gives an account the admin role (or takes it away), or lists the admins.
+//
+//   npm run make-admin -- someone@example.com
+//   npm run make-admin -- someone@example.com --remove
+//   npm run make-admin -- --list
+const db = require("./scriptDb");
 const { User } = require("../models");
 
 const run = async () => {
@@ -13,7 +17,7 @@ const run = async () => {
     process.exit(1);
   }
 
-  await connectDB();
+  await db.open();
 
   if (list) {
     const admins = await User.findAll({ where: { role: "admin" } });
@@ -28,11 +32,11 @@ const run = async () => {
       console.log(`No account found with email ${email}`);
     }
   }
-  await disconnectDB();
+  await db.close();
 };
 
 run().catch(async (error) => {
   console.error("Failed:", error.message);
-  await disconnectDB().catch(() => {});
+  await db.close();
   process.exit(1);
 });

@@ -1,56 +1,58 @@
-// Puts a backup made by `npm run backup` back into a database.
+// Puts a backup made by `npm run backup` back into a MySQL database.
 //
-//   npm run restore -- backups/2026-11-24_0230 --uri "mongodb+srv://.../plotpost_restore?..."
+//   npm run restore -- backups/2026-11-24_0230 --database plotpost_restore
+//
+// It uses the MySQL server, user and password from .env (MYSQL_HOST,
+// MYSQL_USER, MYSQL_PASSWORD), but the database name must be given with
+// --database every time (it's never taken from .env), so you can't restore
+// into the wrong one by accident.
 //
 // Safety:
-//   - The target database must be given with --uri every time (it's never
-//     taken from .env), so you can't restore into the wrong one by accident.
-//   - It refuses if those collections already have data. Add --replace to
-//     delete what's in them first (only for a real emergency).
+//   - Create the target database first (on Hostinger: hPanel → Databases;
+//     the MySQL user needs access to it). Missing tables are created.
+//   - It refuses if those tables already have rows. Add --replace to delete
+//     what's in them first (only for a real emergency).
 //   - Before changing anything it shows what it will do and asks you to type
 //     the database name. (Or pass --confirm <database name>.)
+//   - Everything happens in one transaction: if it fails, nothing changes.
 //
-// Tip: restore into a NEW database name first (e.g. plotpost_restore),
-// check it, and only then point MONGODB_URI at it.
-require("dotenv").config({ quiet: true });
-const dns = require("dns");
+// Tip: restore into a NEW database first (e.g. plotpost_restore), check it,
+// and only then point MYSQL_DATABASE at it.
 const path = require("path");
 const readline = require("readline/promises");
-const mongoose = require("mongoose");
-const { restoreDatabase, readManifest, hidePassword } = require("../utils/dbBackup");
-const { describeMongoUri } = require("../config/startupReport");
 
 const argValue = (args, name) => {
   const at = args.indexOf(name);
   return at >= 0 ? args[at + 1] : undefined;
 };
 
-const run = async () => {
-  const args = process.argv.slice(2);
-  const valueFlags = new Set(["--uri", "--confirm"]);
-  const folderArg = args.find((arg, i) => !arg.startsWith("--") && !valueFlags.has(args[i - 1]));
-  const uri = argValue(args, "--uri");
-  const replace = args.includes("--replace");
-  if (!folderArg || !uri) {
-    console.error('Usage: npm run restore -- <backup folder> --uri "mongodb+srv://…/<database>?…" [--replace]');
-    process.exit(1);
-  }
-  const folder = path.resolve(folderArg);
-  const { database, host } = describeMongoUri(uri);
-  if (!database) {
-    console.error("The --uri address has no database name (…mongodb.net/plotpost_restore?…).");
-    process.exit(1);
-  }
+const args = process.argv.slice(2);
+const valueFlags = new Set(["--database", "--confirm"]);
+const folderArg = args.find((arg, i) => !arg.startsWith("--") && !valueFlags.has(args[i - 1]));
+const database = argValue(args, "--database");
+const replace = args.includes("--replace");
 
+if (!folderArg || !database) {
+  console.error("Usage: npm run restore -- <backup folder> --database <database name> [--replace]");
+  process.exit(1);
+}
+// Must be set before the database settings are read.
+process.env.MYSQL_DATABASE = database;
+
+const db = require("./scriptDb");
+const { restoreDatabase, readManifest } = require("../utils/dbBackup");
+
+const run = async () => {
+  const folder = path.resolve(folderArg);
   const manifest = readManifest(folder);
-  const total = Object.values(manifest.collections).reduce((a, b) => a + b, 0);
+  const total = Object.values(manifest.tables).reduce((a, b) => a + b, 0);
   console.log(`Backup:  ${folder}`);
-  console.log(`         made ${manifest.createdAt} from database "${manifest.database}", ${total} documents`);
-  console.log(`Target:  database "${database}" on ${host}  (${hidePassword(uri)})`);
+  console.log(`         made ${manifest.createdAt} from database "${manifest.database}", ${total} rows`);
+  console.log(`Target:  ${db.describe()}`);
   console.log(
     replace
-      ? "Mode:    --replace: those collections are EMPTIED first, then filled from the backup."
-      : "Mode:    only into empty collections (stops if any have data)."
+      ? "Mode:    --replace: those tables are EMPTIED first, then filled from the backup."
+      : "Mode:    only into empty tables (stops if any have rows)."
   );
 
   let typed = argValue(args, "--confirm");
@@ -61,27 +63,22 @@ const run = async () => {
   }
   if (String(typed).trim() !== database) {
     console.log("Stopped. Nothing was changed.");
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
-  try {
-    dns.setServers(["1.1.1.1", "8.8.8.8"]);
-  } catch (error) {
-    // ignore
-  }
-
-  const client = new mongoose.mongo.MongoClient(uri, { serverSelectionTimeoutMS: 10000 });
-  try {
-    await client.connect();
-    const { restored } = await restoreDatabase(client.db(), folder, { replace });
-    for (const [name, count] of Object.entries(restored)) console.log(`  ${name}: ${count}`);
-    console.log("Restore finished. Start the server once so it rebuilds the indexes.");
-  } finally {
-    await client.close();
-  }
+  const sequelize = await db.open();
+  // Create any missing tables from PlotPost's models (existing ones are left as they are).
+  require("../models");
+  await sequelize.sync();
+  const { restored } = await restoreDatabase(sequelize, folder, { replace });
+  for (const [name, count] of Object.entries(restored)) console.log(`  ${name}: ${count}`);
+  console.log("Restore finished.");
 };
 
-run().catch((error) => {
-  console.error(`Restore failed: ${error.message}`);
-  process.exit(1);
-});
+run()
+  .catch((error) => {
+    console.error(`Restore failed: ${error.message}`);
+    process.exitCode = 1;
+  })
+  .finally(() => db.close());

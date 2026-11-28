@@ -3,7 +3,7 @@ const codeService = require("../services/codeService");
 const emailService = require("../services/emailService");
 const { deleteAccountData } = require("../services/accountDeletion");
 
-const SUPPORT = "WhatsApp +91 62356 49489";
+const SUPPORT = "WhatsApp +91 81296 62030";
 
 const CODE_SENT =
   "If a PlotPost account uses this email, we've sent it a 6-digit code. It can take a minute to arrive; check your spam folder too.";
